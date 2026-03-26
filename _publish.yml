@@ -1,0 +1,4 @@
+- source: rice outlook2.qmd
+  netlify:
+    - id: 79cf484d-1b5a-485f-bae4-e0c81121a15d
+      url: 'https://rice-ph-outlook-2024.netlify.app'
