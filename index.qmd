@@ -40,6 +40,7 @@ library(sf)
 library(leaflet)
 library(daclakeapi)
 library(lubridate)
+library(leaflet.extras2)
 
 
 clean_location <-  function(variable){
@@ -345,10 +346,225 @@ gdp_plot
 
 ## Total Number of Rice Farmers in the Philippines {.tiny-text}
 
-::: {style="transform: scale(0.6); transform-origin: top left; width: 175%; height: 1000px;"}
-<iframe src="http://192.168.10.72:3941/" width="175%" height="1000px" style="border: none;">
 
-</iframe>
+::: columns
+::: {.column width="40%"}
+```{r}
+#| label: farmers_count_data
+
+library(tidyverse)
+library(DT)
+library(plotly)
+library(htmltools)
+library(leaflet)
+library(leaflet.extras2)
+library(geojsonio)
+library(sf)
+
+kpi_ffrs_list <- readRDS("kpi_ffrs_list.rds")
+
+basemaps <- list()
+
+basemaps[["region"]] <-  geojson_read("./phl-admin-psgc-master/phl_regions.geojson", what="sp") %>% 
+  st_as_sf() %>% 
+  mutate(
+    region = case_when(
+      region == "AUTONOMOUS REGION IN MUSLIM MINDANAO (ARMM)" ~ "BANGSAMORO AUTONOMOUS REGION IN MUSLIM MINDANAO (BARMM)",
+      region == "REGION XIII (Caraga)" ~ "REGION XIII (CARAGA)",
+      TRUE ~ region
+    )
+  )
+
+basemaps[["province"]] <-  geojson_read("./phl-admin-psgc-master/phl_provinces_ncr-districts_icc.geojson", what="sp") %>% 
+  st_as_sf() %>% 
+  mutate(
+    region = case_when(
+      region == "AUTONOMOUS REGION IN MUSLIM MINDANAO (ARMM)" ~ "BANGSAMORO AUTONOMOUS REGION IN MUSLIM MINDANAO (BARMM)",
+      region == "REGION XIII (Caraga)" ~ "REGION XIII (CARAGA)",
+      TRUE ~ region
+    )
+  ) %>% 
+  filter(
+    !psgc_province %in% c("PH150700000", "PH129800000", "PH086403000")
+  )
+
+reg_map_data = basemaps[["region"]] %>%
+  left_join(kpi_ffrs_list[["region"]] %>%
+              select(location, number_farmers),
+            by = c("region" = "location")) %>%
+  rename(location = region)
+
+prov_map_data = basemaps[["province"]] %>%
+  left_join(kpi_ffrs_list[["province"]] %>%
+              select(location, number_farmers),
+            by = c("province" = "location")) %>%
+  rename(location = province)
+
+natl_map_data <- reg_map_data |> 
+  st_drop_geometry() |> 
+  summarise(number_farmers = sum(number_farmers, na.rm = TRUE)) |> 
+  mutate(
+    number_farmers = format(
+      number_farmers, scientific = FALSE, big.mark = ","
+    )
+  ) |> 
+  pull(number_farmers)
+```
+
+::: flex-row
+::: {.value-box2 .steelblue}
+::: value-title2
+Total Number of Farmers
+:::
+
+::: value-number2
+`r natl_map_data`
+:::
+:::
+
+::: {.custom_dt_wrapper}
+```{r}
+#| label: farmers_count_dt
+
+table_data <- kpi_ffrs_list[["region"]] |> 
+  select(location, number_farmers) |> 
+  mutate(
+    location = case_when(
+      location == "BANGSAMORO AUTONOMOUS REGION IN MUSLIM MINDANAO (BARMM)" ~ "BARMM",
+      TRUE ~ location
+    )
+  ) |> 
+  arrange(desc(number_farmers))
+
+table_data %>%
+  datatable(
+    selection = 'single',
+    class = "row-border",
+    colnames = c("Region", "Number of Farmers"),
+    options = list(
+      dom = "t",
+      scrollX = TRUE,
+      pageLength = 50,
+      autoWidth = TRUE,
+      columnDefs = list(
+        list(visible = FALSE, targets = 0),
+        list(width = "100px", targets = 1),
+        list(width = "80px", targets = 2),
+        list(targets = c(1), className = "dt-left"),
+        list(targets = c(2), className = "dt-right"),
+        list(orderable = FALSE, targets = "_all")
+      ),
+      rowCallback = JS(
+        "function(row, data, index) {",
+        "  $('td', row).css('padding', '6px');",
+        "}"
+      )
+    )
+  ) %>%
+  formatStyle(
+    "number_farmers",
+    background = styleColorBar(table_data$number_farmers, "#54FF9F")
+  ) %>%
+  formatRound(2)
+```
+:::
+
+:::
+:::
+
+::: {.column width="60%"}
+```{r}
+#| label: farmers_count_map
+#| echo: false
+
+pal <- colorBin(
+  palette = c("#8B1A1A", "#E69F00", "#F0E442", "#117733", "#56B4E9"),
+  domain = reg_map_data[["number_farmers"]],
+  bins = c(0, 50000, 150000, 300000, 450000, Inf),
+  na.color = "transparent"
+)
+
+reg_map_data_pal <- reg_map_data |> 
+  mutate(
+    color = if_else(
+      number_farmers == 0, "grey",
+      pal(number_farmers)
+    )
+  )
+
+leaflet(
+  width = 600,
+  height = 600,
+  options = leafletOptions(zoomControl = FALSE)
+  ) |>
+  addProviderTiles("CartoDB.VoyagerNoLabels", options = providerTileOptions(minZoom = 5)) |>
+  setView(lng = 121.7740, lat = 12.8797, zoom = 6) |>
+  addEasyButton(easyButton(
+    icon = "fa-plus",
+    title = "Zoom In",
+    position = "topleft",
+    onClick = JS("function(btn, map){ map.zoomIn(); }")
+  )) |>
+  addEasyButton(
+    easyButton(
+      icon = "fa-rotate-right",
+      title = "Reset Zoom",
+      position = "topleft",
+      onClick = JS("function(btn, map){ map.setView([12.8797, 121.7740], 6); }")
+    )
+  ) |>
+  addEasyButton(easyButton(
+    icon = "fa-minus",
+    title = "Zoom Out",
+    position = "topleft",
+    onClick = JS("function(btn, map){ map.zoomOut(); }")
+  )) |> 
+  addPolygons(
+    data = reg_map_data_pal,
+    fillColor = ~color,
+    color = "black",
+    weight = 1,
+    opacity = 1,
+    fillOpacity = 0.9,
+    group = "farmers",
+    highlight = highlightOptions(weight = 3, color = "#666", fillOpacity = 0.7),
+    label = ~ paste(
+      location,
+      "<br>",
+      "Number of Farmers: ",
+      format(round(number_farmers, 2), big.mark = ",")
+    ) |> lapply(htmltools::HTML),
+    labelOptions = labelOptions(
+      style = list(
+        "font-family" = "Roboto",
+        "font-weight" = "bold",
+        "font-size" = "12px",
+        "color" = "black"
+      ),
+      direction = "right",
+      offset = c(250, 50),
+    )
+  ) |> 
+  addLegend(
+    data = reg_map_data_pal,
+    pal = pal,
+    values = ~number_farmers,
+    title = "Number of Farmers",
+    opacity = 0.9,
+    position = "topright",
+    group = "farmers",
+    layerId = "legend",
+    labFormat = function(type, cuts, p) {
+      c("<50,000",
+        "50,000 - 150,000",
+        "150,000 - 300,000",
+        "300,000 - 450,000",
+        ">450,000")
+    }
+  ) |> 
+  addControl(html = "<div style='font-size: 9px; font-style: italic;'>Source: FFRS</div>", position = "bottomleft")
+```
+:::
 :::
 
 # Supply
