@@ -10,6 +10,18 @@
   height: 600px !important;
 }
 
+.custom_dt_wrapper {
+  max-height: 445px;
+  overflow-y: auto;
+  font-size: 10px;
+  border: 1px solid #ccc;
+  border-width: 0.5px; 
+}
+
+.custom_dt_wrapper td {
+  font-size: 9px;
+}
+
 .flex-row {
   display: flex;
   flex-wrap: wrap;
@@ -27,12 +39,32 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+.value-box2 {
+  border-radius: 10px;
+  padding: 15px;
+  height: 100px;
+  width: 300px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
 .value-number {
   font-weight: bold;
   font-size: 3rem;
 }
 
+.value-number2 {
+  font-weight: bold;
+  font-size: 3rem;
+  position: relative;
+  bottom: 10px;
+}
+
 .value-title {
+  font-size: 1rem;
+}
+
+.value-title2 {
   font-size: 1rem;
 }
 
@@ -54,6 +86,11 @@
 .value-box.orange {
   background-color: #fff3e0;
   color: #f57c00;
+}
+
+.value-box2.steelblue {
+  background-color: #87CEFF;
+  color: #00008B;
 }
 
 .thank-you {
